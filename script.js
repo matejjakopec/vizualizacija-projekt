@@ -130,7 +130,7 @@ Promise.all([
         yearLabel.text(year);
         updateMap(year);
         updateLegend(); // Update legend when map is updated
-        updatePieChart(year);
+        updatePieCharts(year);
     });
 
     function updateMap(year) {
@@ -179,6 +179,42 @@ Promise.all([
         legend.select(".legend-text-min").text(formatter.format(minEmission));
         legend.select(".legend-text-max").text(formatter.format(maxEmission));
     }
+
+    let playing = false;
+    let timer;
+
+// Function to update the slider value and map
+    function updateYear() {
+        let year = +yearSlider.property("value");
+        if (year < 2019) {
+            year += 1;
+        } else {
+            clearInterval(timer);
+            playing = false;
+            playButton.text("Play");
+            return;
+        }
+        yearSlider.property("value", year);
+        yearLabel.text(year);
+        updateMap(year);
+        updateLegend(); // Update legend when map is updated
+        updatePieCharts(year);
+    }
+
+// Handle play button click
+    const playButton = d3.select("#playButton");
+    playButton.on("click", function () {
+        if (playing) {
+            clearInterval(timer);
+            playing = false;
+            playButton.text("Play");
+        } else {
+            recenterMap();
+            timer = setInterval(updateYear, 500); // Update year every 0.5 seconds
+            playing = true;
+            playButton.text("Pause");
+        }
+    });
 
 });
 
@@ -242,7 +278,7 @@ function updateComparison(selectedCountry, countryName) {
             .attr("height", 250)
             .style("position", "absolute")
             .style("top", `${height + 200}px`)
-            .style("left", `${index * 400}px`);
+            .style("left", `${index * 550}px`);
 
         // Add country name above the bar chart
         barChartSvg.append("text")
@@ -314,15 +350,16 @@ function updateComparison(selectedCountry, countryName) {
     // Create pie chart if both countries are selected
     if (selectedCountries.length === 2) {
         const selectedYear = +yearSlider.property("value");
-        updatePieChart(selectedYear);
+        updatePieCharts(selectedYear);
     }
 }
 
-function updatePieChart(selectedYear) {
+function updatePieCharts(selectedYear) {
     const pieData = selectedCountries.map(country => {
         const data = emissionsData.find(d => d.country_code === country.countryCode && d.year === selectedYear);
         return { countryName: country.countryName, value: data ? data.value : 0 };
     });
+    d3.selectAll("#pie-chart").remove();
 
     const pieChartSvg = d3.select("#map").append("svg")
         .attr("id", "pie-chart")
@@ -348,19 +385,124 @@ function updatePieChart(selectedYear) {
     const legend = pieChartSvg.append("g")
         .attr("transform", "translate(220, 20)");
 
+    let sum = pieData[0].value + pieData[1].value;
+
     pieData.forEach((d, i) => {
         const legendRow = legend.append("g")
-            .attr("transform", `translate(0, ${i * 20})`);
+            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("class", "pie-legend");
 
         legendRow.append("rect")
             .attr("width", 10)
-            .attr("height", 10)
+            .attr("width", 10)
             .attr("fill", d3.schemeCategory10[i]);
 
         legendRow.append("text")
             .attr("x", 20)
             .attr("y", 10)
+            .attr("letter-spacing", 0.8)
             .attr("text-anchor", "start")
-            .text(d.countryName);
+            .text(`${d.countryName} (${(d.value / sum * 100).toFixed(2)}%)`);
+    });
+
+    const worldData = emissionsData.find(d => d.country_code === "WLD" && d.year === selectedYear);
+    const country1 = emissionsData.find(d => d.country_code === selectedCountries[0].countryCode && d.year === selectedYear);
+    const pieData1 = [
+        { countryName: country1.country_name, value: country1.value ? country1.value : 0 },
+        { countryName: worldData.country_name, value: worldData.value ? worldData.value : 0 }
+    ];
+
+    const pieChartSvg1 = d3.select("#map").append("svg")
+        .attr("id", "pie-chart")
+        .attr("width", 500)
+        .attr("height", 300)
+        .style("position", "absolute")
+        .style("top", `${height + 500}px`)
+        .style("left", "50px");
+
+    const pie1 = d3.pie().value(d => d.value);
+    const arc1 = d3.arc().innerRadius(0).outerRadius(100);
+
+    const pieGroup1 = pieChartSvg1.append("g")
+        .attr("transform", "translate(150, 150)");
+
+    pieGroup1.selectAll("path")
+        .data(pie1(pieData1))
+        .enter().append("path")
+        .attr("d", arc1)
+        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+    // Add legend next to the pie chart
+    const legend1 = pieChartSvg1.append("g")
+        .attr("transform", "translate(220, 20)");
+
+    let sum1 = pieData1[0].value + pieData1[1].value;
+
+    pieData1.forEach((d, i) => {
+        const legendRow = legend1.append("g")
+            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("class", "pie-legend");
+
+        legendRow.append("rect")
+            .attr("width", 10)
+            .attr("width", 10)
+            .attr("fill", d3.schemeCategory10[i]);
+
+        legendRow.append("text")
+            .attr("x", 20)
+            .attr("y", 10)
+            .attr("letter-spacing", 0.8)
+            .attr("text-anchor", "start")
+            .text(`${d.countryName} (${(d.value / sum1 * 100).toFixed(2)}%)`);
+    });
+
+    const country2 = emissionsData.find(d => d.country_code === selectedCountries[1].countryCode && d.year === selectedYear);
+    const pieData2 = [
+        { countryName: country2.country_name, value: country2.value ? country2.value : 0 },
+        { countryName: worldData.country_name, value: worldData.value ? worldData.value : 0 }
+    ];
+
+    const pieChartSvg2 = d3.select("#map").append("svg")
+        .attr("id", "pie-chart")
+        .attr("width", 500)
+        .attr("height", 300)
+        .style("position", "absolute")
+        .style("top", `${height + 500}px`)
+        .style("left", "550px");
+
+    const pie2 = d3.pie().value(d => d.value);
+    const arc2 = d3.arc().innerRadius(0).outerRadius(100);
+
+    const pieGroup2 = pieChartSvg2.append("g")
+        .attr("transform", "translate(150, 150)");
+
+    pieGroup2.selectAll("path")
+        .data(pie2(pieData2))
+        .enter().append("path")
+        .attr("d", arc2)
+        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+    // Add legend next to the pie chart
+    const legend2 = pieChartSvg2.append("g")
+        .attr("transform", "translate(220, 20)");
+
+    let sum2 = pieData2[0].value + pieData2[1].value;
+
+    pieData2.forEach((d, i) => {
+        const legendRow = legend2.append("g")
+            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("class", "pie-legend");
+
+        legendRow.append("rect")
+            .attr("width", 10)
+            .attr("width", 10)
+            .attr("fill", d3.schemeCategory10[i]);
+
+        legendRow.append("text")
+            .attr("x", 20)
+            .attr("y", 10)
+            .attr("letter-spacing", 0.8)
+            .attr("text-anchor", "start")
+            .text(`${d.countryName} (${(d.value / sum2 * 100).toFixed(2)}%)`);
     });
 }
