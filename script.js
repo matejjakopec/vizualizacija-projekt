@@ -1,3 +1,8 @@
+const formatter = Intl.NumberFormat('en-US', {
+    notation: "compact",
+    maximumFractionDigits: 2
+});
+
 const width = 960 * 1.5, height = 600 * 1.5;
 const svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
 
@@ -42,9 +47,14 @@ const tooltip = d3.select("body").append("div")
 
 // Create the legend
 const legendWidth = 200, legendHeight = 20;
-const legend = svg.append("g")
+const legend = d3.select("#map").append("svg")
     .attr("class", "legend")
-    .attr("transform", "translate(20, 120)");
+    .style("position", "absolute")
+    .style("width", legendWidth)
+    .style("height", legendHeight + 20)
+    .style("top", "50px")
+    .style("left", "50px")
+    .style("background", "white");
 
 const defs = legend.append("defs");
 
@@ -69,14 +79,14 @@ legend.append("text")
     .attr("class", "legend-text-min")
     .attr("x", 0)
     .attr("y", legendHeight + 15)
-    .text("11");
+    .text(formatter.format(11));
 
 legend.append("text")
     .attr("class", "legend-text-max")
     .attr("x", legendWidth)
     .attr("y", legendHeight + 15)
     .attr("text-anchor", "end")
-    .text("2890696.10");
+    .text(formatter.format(2890696.10));
 
 Promise.all([
     d3.json(dataUrl),
@@ -102,7 +112,8 @@ Promise.all([
             const countryName = d.properties.name;
             const alpha3Code = d.id;
             const emission = countryEmissions[alpha3Code];
-            const emissionText = emission ? emission.toFixed(2) : "Data not available";
+            const emissionText = emission ? formatter.format(emission) : "Data not available";
+            updateComparison(alpha3Code);
             tooltip.transition().duration(200).style("opacity", .9);
             tooltip.html(`<strong>${countryName}</strong><br/>CO2 Emission: ${emissionText}`)
                 .style("left", (event.pageX + 5) + "px")
@@ -131,7 +142,7 @@ Promise.all([
             // For Soviet countries (excluding Russia) before 1990, use Russian data
             if (d.country_code === "RUS" && year < 1990) {
                 // Iterate over each Soviet country
-                ["ARM", "AZE", "BLR", "EST", "GEO", "KAZ", "KGZ", "LVA", "LTU", "MDA", "TKM", "TJK", "UKR", "UZB", "RUS", "DEU", "CZE", "SVK", "PLN"].forEach(sovietCountry => {
+                ["ARM", "AZE", "BLR", "EST", "GEO", "KAZ", "KGZ", "LVA", "LTU", "MDA", "TKM", "TJK", "UKR", "UZB", "RUS", "DEU", "CZE", "SVK", "POL"].forEach(sovietCountry => {
                     countryEmissions[sovietCountry] = d.value;
                 });
             } else {
@@ -164,16 +175,20 @@ Promise.all([
         colorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain([maxEmission, minEmission]);
 
         // Fixing the legend text
-        legend.select(".legend-text-min").text(minEmission.toFixed(2));
-        legend.select(".legend-text-max").text(maxEmission.toFixed(2));
+        legend.select(".legend-text-min").text(formatter.format(minEmission));
+        legend.select(".legend-text-max").text(formatter.format(maxEmission));
     }
 
 });
 
 // Create a button to recentre the map
-const recenterButton = svg.append("g")
+const recenterButton = d3.select("#map").append("svg")
     .attr("class", "recenter-button")
-    .attr("transform", `translate(${width - 150}, ${height - 50})`);
+    .attr("width", 100)
+    .attr("height", 30)
+    .style("position", "absolute")
+    .style("top", `${height - 50}px`)
+    .style("left", `${width - 150}px`);
 
 recenterButton.append("rect")
     .attr("width", 100)
@@ -200,4 +215,81 @@ function recenterMap() {
         d3.zoomTransform(svg.node()).invert([width / 2, height / 2])
     );
 }
+
+function updateComparison(selectedCountry) {
+
+    // Filter emissions data for the selected country
+    const countryData = emissionsData.filter(d => d.country_code === selectedCountry);
+
+    // Clear previous bar chart
+    d3.select("#bar-chart").remove();
+
+    // Create a new SVG for the bar chart
+    const barChartSvg = d3.select("#map").append("svg")
+        .attr("id", "bar-chart")
+        .attr("width", 400)
+        .attr("height", 250)
+        .style("position", "absolute")
+        .style("top", "300px")
+        .style("right", "50px");
+
+    // Prepare data for bar chart
+    const barChartData = countryData.map(d => ({
+        year: d.year,
+        value: d.value
+    }));
+
+    // Set up scales and axes for the bar chart
+    const xScale = d3.scaleBand()
+        .domain(barChartData.map(d => d.year))
+        .range([100, 400])
+        .padding(0.1);
+
+    const years = barChartData.map(d => d.year);
+    const xAxis = d3.axisBottom(xScale)
+        .tickValues(years.filter((d, i) => i % 10 === 0 || i === years.length - 1));
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(barChartData, d => d.value)])
+        .nice()
+        .range([150, 10]);
+
+    const yAxis = d3.axisLeft(yScale);
+
+    // Draw bars
+    barChartSvg.selectAll(".bar")
+        .data(barChartData)
+        .enter().append("rect")
+        .attr("class", "bar")
+        .attr("x", d => xScale(d.year))
+        .attr("y", d => yScale(d.value))
+        .attr("width", xScale.bandwidth())
+        .attr("height", d => 150 - yScale(d.value))
+        .attr("fill", "steelblue");
+
+    // Add x-axis
+    barChartSvg.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", "translate(0,150)")
+        .call(xAxis)
+        .selectAll("text")
+        .attr("dy", ".35em")
+        .style("text-anchor", "end");
+
+    // Add y-axis
+    barChartSvg.append("g")
+        .attr("class", "y-axis")
+        .attr("transform", "translate(100,0)")
+        .call(yAxis);
+
+    // Rotate x-axis labels vertically
+    barChartSvg.selectAll(".x-axis text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -10)
+        .attr("y", 0)
+        .attr("dy", ".35em")
+        .style("text-anchor", "end");
+}
+
+
 
