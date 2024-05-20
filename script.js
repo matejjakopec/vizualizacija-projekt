@@ -113,7 +113,7 @@ Promise.all([
             const alpha3Code = d.id;
             const emission = countryEmissions[alpha3Code];
             const emissionText = emission ? formatter.format(emission) : "Data not available";
-            updateComparison(alpha3Code);
+            updateComparison(alpha3Code, countryName);
             tooltip.transition().duration(200).style("opacity", .9);
             tooltip.html(`<strong>${countryName}</strong><br/>CO2 Emission: ${emissionText}`)
                 .style("left", (event.pageX + 5) + "px")
@@ -130,6 +130,7 @@ Promise.all([
         yearLabel.text(year);
         updateMap(year);
         updateLegend(); // Update legend when map is updated
+        updatePieChart(year);
     });
 
     function updateMap(year) {
@@ -216,80 +217,150 @@ function recenterMap() {
     );
 }
 
-function updateComparison(selectedCountry) {
+let selectedCountries = [];
 
+function updateComparison(selectedCountry, countryName) {
     // Filter emissions data for the selected country
     const countryData = emissionsData.filter(d => d.country_code === selectedCountry);
 
-    // Clear previous bar chart
-    d3.select("#bar-chart").remove();
+    if (!selectedCountries.some(c => c.countryCode === selectedCountry)) {
+        if (selectedCountries.length === 2) {
+            selectedCountries.shift(); // Remove the first selected country if already two
+        }
+        selectedCountries.push({ countryCode: selectedCountry, countryName });
+    }
 
-    // Create a new SVG for the bar chart
-    const barChartSvg = d3.select("#map").append("svg")
-        .attr("id", "bar-chart")
-        .attr("width", 400)
-        .attr("height", 250)
-        .style("position", "absolute")
-        .style("top", "300px")
-        .style("right", "50px");
+    // Clear previous bar charts and pie chart
+    d3.selectAll("#bar-chart").remove();
+    d3.selectAll("#pie-chart").remove();
 
-    // Prepare data for bar chart
-    const barChartData = countryData.map(d => ({
-        year: d.year,
-        value: d.value
-    }));
+    // Create a new SVG for each bar chart
+    selectedCountries.forEach((country, index) => {
+        const barChartSvg = d3.select("#map").append("svg")
+            .attr("id", "bar-chart")
+            .attr("width", 400)
+            .attr("height", 250)
+            .style("position", "absolute")
+            .style("top", `${height + 200}px`)
+            .style("left", `${index * 400}px`);
 
-    // Set up scales and axes for the bar chart
-    const xScale = d3.scaleBand()
-        .domain(barChartData.map(d => d.year))
-        .range([100, 400])
-        .padding(0.1);
+        // Add country name above the bar chart
+        barChartSvg.append("text")
+            .attr("x", 250)
+            .attr("y", 16)
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .style("font-weight", "bold")
+            .text(country.countryName);
 
-    const years = barChartData.map(d => d.year);
-    const xAxis = d3.axisBottom(xScale)
-        .tickValues(years.filter((d, i) => i % 10 === 0 || i === years.length - 1));
+        // Prepare data for bar chart
+        const barChartData = emissionsData.filter(d => d.country_code === country.countryCode).map(d => ({
+            year: d.year,
+            value: d.value
+        }));
 
-    const yScale = d3.scaleLinear()
-        .domain([0, d3.max(barChartData, d => d.value)])
-        .nice()
-        .range([150, 10]);
+        // Set up scales and axes for the bar chart
+        const xScale = d3.scaleBand()
+            .domain(barChartData.map(d => d.year))
+            .range([100, 400])
+            .padding(0.1);
 
-    const yAxis = d3.axisLeft(yScale);
+        const years = barChartData.map(d => d.year);
+        const xAxis = d3.axisBottom(xScale)
+            .tickValues(years.filter((d, i) => i % 10 === 0 || i === years.length - 1));
 
-    // Draw bars
-    barChartSvg.selectAll(".bar")
-        .data(barChartData)
-        .enter().append("rect")
-        .attr("class", "bar")
-        .attr("x", d => xScale(d.year))
-        .attr("y", d => yScale(d.value))
-        .attr("width", xScale.bandwidth())
-        .attr("height", d => 150 - yScale(d.value))
-        .attr("fill", "steelblue");
+        const yScale = d3.scaleLinear()
+            .domain([0, d3.max(barChartData, d => d.value)])
+            .nice()
+            .range([200, 50]);
 
-    // Add x-axis
-    barChartSvg.append("g")
-        .attr("class", "x-axis")
-        .attr("transform", "translate(0,150)")
-        .call(xAxis)
-        .selectAll("text")
-        .attr("dy", ".35em")
-        .style("text-anchor", "end");
+        const yAxis = d3.axisLeft(yScale);
 
-    // Add y-axis
-    barChartSvg.append("g")
-        .attr("class", "y-axis")
-        .attr("transform", "translate(100,0)")
-        .call(yAxis);
+        // Draw bars
+        barChartSvg.selectAll(".bar")
+            .data(barChartData)
+            .enter().append("rect")
+            .attr("class", "bar")
+            .attr("x", d => xScale(d.year))
+            .attr("y", d => yScale(d.value))
+            .attr("width", xScale.bandwidth())
+            .attr("height", d => 200 - yScale(d.value))
+            .attr("fill", "steelblue");
 
-    // Rotate x-axis labels vertically
-    barChartSvg.selectAll(".x-axis text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -10)
-        .attr("y", 0)
-        .attr("dy", ".35em")
-        .style("text-anchor", "end");
+        // Add x-axis
+        barChartSvg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", "translate(0,200)")
+            .call(xAxis)
+            .selectAll("text")
+            .attr("dy", ".35em")
+            .style("text-anchor", "end");
+
+        // Add y-axis
+        barChartSvg.append("g")
+            .attr("class", "y-axis")
+            .attr("transform", "translate(100,0)")
+            .call(yAxis);
+
+        // Rotate x-axis labels vertically
+        barChartSvg.selectAll(".x-axis text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -10)
+            .attr("y", 0)
+            .attr("dy", ".35em")
+            .style("text-anchor", "end");
+    });
+
+    // Create pie chart if both countries are selected
+    if (selectedCountries.length === 2) {
+        const selectedYear = +yearSlider.property("value");
+        updatePieChart(selectedYear);
+    }
 }
 
+function updatePieChart(selectedYear) {
+    const pieData = selectedCountries.map(country => {
+        const data = emissionsData.find(d => d.country_code === country.countryCode && d.year === selectedYear);
+        return { countryName: country.countryName, value: data ? data.value : 0 };
+    });
 
+    const pieChartSvg = d3.select("#map").append("svg")
+        .attr("id", "pie-chart")
+        .attr("width", 500)
+        .attr("height", 300)
+        .style("position", "absolute")
+        .style("top", `${height + 200}px`)
+        .style("left", "1000px");
 
+    const pie = d3.pie().value(d => d.value);
+    const arc = d3.arc().innerRadius(0).outerRadius(100);
+
+    const pieGroup = pieChartSvg.append("g")
+        .attr("transform", "translate(150, 150)");
+
+    pieGroup.selectAll("path")
+        .data(pie(pieData))
+        .enter().append("path")
+        .attr("d", arc)
+        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+    // Add legend next to the pie chart
+    const legend = pieChartSvg.append("g")
+        .attr("transform", "translate(220, 20)");
+
+    pieData.forEach((d, i) => {
+        const legendRow = legend.append("g")
+            .attr("transform", `translate(0, ${i * 20})`);
+
+        legendRow.append("rect")
+            .attr("width", 10)
+            .attr("height", 10)
+            .attr("fill", d3.schemeCategory10[i]);
+
+        legendRow.append("text")
+            .attr("x", 20)
+            .attr("y", 10)
+            .attr("text-anchor", "start")
+            .text(d.countryName);
+    });
+}
