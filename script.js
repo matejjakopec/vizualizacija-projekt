@@ -321,7 +321,7 @@ function updateComparison(selectedCountry, countryName) {
             .attr("y", d => yScale(d.value))
             .attr("width", xScale.bandwidth())
             .attr("height", d => 200 - yScale(d.value))
-            .attr("fill", "steelblue");
+            .attr("fill", d3.schemeCategory10[index]);
 
         // Add x-axis
         barChartSvg.append("g")
@@ -389,12 +389,12 @@ function updatePieCharts(selectedYear) {
 
     pieData.forEach((d, i) => {
         const legendRow = legend.append("g")
-            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("transform", `translate(20, ${i * 20})`)
             .attr("class", "pie-legend");
 
         legendRow.append("rect")
             .attr("width", 10)
-            .attr("width", 10)
+            .attr("height", 10)
             .attr("fill", d3.schemeCategory10[i]);
 
         legendRow.append("text")
@@ -430,7 +430,13 @@ function updatePieCharts(selectedYear) {
         .data(pie1(pieData1))
         .enter().append("path")
         .attr("d", arc1)
-        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+        .attr("fill", function(d, i) {
+            if (i === 1) {
+                return d3.schemeCategory10[i+1];
+            } else {
+                return d3.schemeCategory10[0];
+            }
+        });
 
     // Add legend next to the pie chart
     const legend1 = pieChartSvg1.append("g")
@@ -440,13 +446,19 @@ function updatePieCharts(selectedYear) {
 
     pieData1.forEach((d, i) => {
         const legendRow = legend1.append("g")
-            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("transform", `translate(20, ${i * 20})`)
             .attr("class", "pie-legend");
 
+        let color;
+        if (i === 1) {
+            color = d3.schemeCategory10[i+1];
+        } else {
+            color = d3.schemeCategory10[0];
+        }
         legendRow.append("rect")
             .attr("width", 10)
-            .attr("width", 10)
-            .attr("fill", d3.schemeCategory10[i]);
+            .attr("height", 10)
+            .attr("fill", color);
 
         legendRow.append("text")
             .attr("x", 20)
@@ -480,7 +492,13 @@ function updatePieCharts(selectedYear) {
         .data(pie2(pieData2))
         .enter().append("path")
         .attr("d", arc2)
-        .attr("fill", (d, i) => d3.schemeCategory10[i]);
+        .attr("fill", function(d, i) {
+            if (i === 1) {
+                return d3.schemeCategory10[i+1];
+            } else {
+                return d3.schemeCategory10[1];
+            }
+        });
 
     // Add legend next to the pie chart
     const legend2 = pieChartSvg2.append("g")
@@ -490,13 +508,19 @@ function updatePieCharts(selectedYear) {
 
     pieData2.forEach((d, i) => {
         const legendRow = legend2.append("g")
-            .attr("transform", `translate(0, ${i * 20})`)
+            .attr("transform", `translate(20, ${i * 20})`)
             .attr("class", "pie-legend");
 
+        let color;
+        if (i === 1) {
+            color = d3.schemeCategory10[i+1];
+        } else {
+            color = d3.schemeCategory10[1];
+        }
         legendRow.append("rect")
             .attr("width", 10)
-            .attr("width", 10)
-            .attr("fill", d3.schemeCategory10[i]);
+            .attr("height", 10)
+            .attr("fill", color);
 
         legendRow.append("text")
             .attr("x", 20)
