@@ -3,7 +3,7 @@ const formatter = Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2
 });
 
-const width = 960 * 1.5, height = 600 * 1.5;
+const width = 1000, height = 700;
 const svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
 
 const projection = d3.geoMercator().scale(150).translate([width / 2, height / 1.5]);
@@ -52,20 +52,21 @@ const legend = d3.select("#map").append("svg")
     .style("position", "absolute")
     .style("width", legendWidth)
     .style("height", legendHeight + 20)
-    .style("top", "50px")
-    .style("left", "50px")
+    .style("top", "120px")
+    .style("left", "440px")
     .style("background", "white");
 
 const defs = legend.append("defs");
 
 const linearGradient = defs.append("linearGradient")
     .attr("id", "linear-gradient");
-
+let linearGradientData = colorScale.ticks().map((t, i, n) => ({
+    offset: `${100 - 100 * i / n.length}%`,
+    color: colorScale(t),
+    max: n.length
+}));
 linearGradient.selectAll("stop")
-    .data(colorScale.ticks().map((t, i, n) => ({
-        offset: `${100 * i / n.length}%`,
-        color: colorScale(t)
-    })))
+    .data(linearGradientData.reverse())
     .enter().append("stop")
     .attr("offset", d => d.offset)
     .attr("stop-color", d => d.color);
@@ -108,6 +109,7 @@ Promise.all([
         .enter().append("path")
         .attr("d", path)
         .attr("class", "country")
+        .style("cursor", "pointer")
         .on("click", function (event, d) {
             const countryName = d.properties.name;
             const alpha3Code = d.id;
@@ -224,13 +226,13 @@ const recenterButton = d3.select("#map").append("svg")
     .attr("width", 100)
     .attr("height", 30)
     .style("position", "absolute")
-    .style("top", `${height - 50}px`)
-    .style("left", `${width - 150}px`);
+    .style("top", `${height + 50}px`)
+    .style("right", `450px`);
 
 recenterButton.append("rect")
     .attr("width", 100)
     .attr("height", 30)
-    .style("fill", "#107AB0")
+    .style("fill", "#5A9F68")
     .style("cursor", "pointer")
     .on("click", recenterMap);
 
@@ -241,6 +243,8 @@ recenterButton.append("text")
     .attr("dominant-baseline", "middle")
     .style("font-size", "14px")
     .style("cursor", "pointer")
+    .style("fill", "white")
+    .style("font-weight", "bold")
     .on("click", recenterMap)
     .text("Recenter");
 
@@ -274,16 +278,16 @@ function updateComparison(selectedCountry, countryName) {
     selectedCountries.forEach((country, index) => {
         const barChartSvg = d3.select("#map").append("svg")
             .attr("id", "bar-chart")
-            .attr("width", 400)
-            .attr("height", 250)
+            .attr("width", 500)
+            .attr("height", 300)
             .style("position", "absolute")
-            .style("top", `${height + 200}px`)
-            .style("left", `${index * 550}px`);
+            .style("top", `${height + 355}px`)
+            .style("left", `${index * 535 + 150}px`);
 
         // Add country name above the bar chart
         barChartSvg.append("text")
             .attr("x", 250)
-            .attr("y", 16)
+            .attr("y", 25)
             .attr("text-anchor", "middle")
             .style("font-size", "16px")
             .style("font-weight", "bold")
@@ -308,7 +312,7 @@ function updateComparison(selectedCountry, countryName) {
         const yScale = d3.scaleLinear()
             .domain([0, d3.max(barChartData, d => d.value)])
             .nice()
-            .range([200, 50]);
+            .range([250, 75]);
 
         const yAxis = d3.axisLeft(yScale);
 
@@ -320,13 +324,13 @@ function updateComparison(selectedCountry, countryName) {
             .attr("x", d => xScale(d.year))
             .attr("y", d => yScale(d.value))
             .attr("width", xScale.bandwidth())
-            .attr("height", d => 200 - yScale(d.value))
+            .attr("height", d => 250 - yScale(d.value))
             .attr("fill", d3.schemeCategory10[index]);
 
         // Add x-axis
         barChartSvg.append("g")
             .attr("class", "x-axis")
-            .attr("transform", "translate(0,200)")
+            .attr("transform", "translate(0,250)")
             .call(xAxis)
             .selectAll("text")
             .attr("dy", ".35em")
@@ -355,10 +359,12 @@ function updateComparison(selectedCountry, countryName) {
 }
 
 function updatePieCharts(selectedYear) {
-    const pieData = selectedCountries.map(country => {
-        const data = emissionsData.find(d => d.country_code === country.countryCode && d.year === selectedYear);
-        return { countryName: country.countryName, value: data ? data.value : 0 };
-    });
+    const countryComp1 = emissionsData.find(d => d.country_code === selectedCountries[0].countryCode && d.year === selectedYear);
+    const countryComp2 = emissionsData.find(d => d.country_code === selectedCountries[1].countryCode && d.year === selectedYear);
+    const pieData = [
+        { countryName: countryComp1.country_name, value: countryComp1.value ? countryComp1.value : 0 },
+        { countryName: countryComp2.country_name, value: countryComp2.value ? countryComp2.value : 0 }
+    ];
     d3.selectAll("#pie-chart").remove();
 
     const pieChartSvg = d3.select("#map").append("svg")
@@ -366,8 +372,8 @@ function updatePieCharts(selectedYear) {
         .attr("width", 500)
         .attr("height", 300)
         .style("position", "absolute")
-        .style("top", `${height + 200}px`)
-        .style("left", "1000px");
+        .style("top", `${height + 525}px`)
+        .style("right", "100px");
 
     const pie = d3.pie().value(d => d.value);
     const arc = d3.arc().innerRadius(0).outerRadius(100);
@@ -388,6 +394,7 @@ function updatePieCharts(selectedYear) {
     let sum = pieData[0].value + pieData[1].value;
 
     pieData.forEach((d, i) => {
+        console.log(d);
         const legendRow = legend.append("g")
             .attr("transform", `translate(20, ${i * 20})`)
             .attr("class", "pie-legend");
@@ -417,8 +424,8 @@ function updatePieCharts(selectedYear) {
         .attr("width", 500)
         .attr("height", 300)
         .style("position", "absolute")
-        .style("top", `${height + 500}px`)
-        .style("left", "50px");
+        .style("top", `${height + 700}px`)
+        .style("left", "150px");
 
     const pie1 = d3.pie().value(d => d.value);
     const arc1 = d3.arc().innerRadius(0).outerRadius(100);
@@ -479,8 +486,8 @@ function updatePieCharts(selectedYear) {
         .attr("width", 500)
         .attr("height", 300)
         .style("position", "absolute")
-        .style("top", `${height + 500}px`)
-        .style("left", "550px");
+        .style("top", `${height + 700}px`)
+        .style("left", "685px");
 
     const pie2 = d3.pie().value(d => d.value);
     const arc2 = d3.arc().innerRadius(0).outerRadius(100);
