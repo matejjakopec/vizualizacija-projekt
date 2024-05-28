@@ -226,8 +226,8 @@ const recenterButton = d3.select("#map").append("svg")
     .attr("width", 100)
     .attr("height", 30)
     .style("position", "absolute")
-    .style("top", `${height + 50}px`)
-    .style("right", `450px`);
+    .style("top", `${height + 35}px`)
+    .style("right", `425px`);
 
 recenterButton.append("rect")
     .attr("width", 100)
